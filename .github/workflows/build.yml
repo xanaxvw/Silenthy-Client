@@ -2,7 +2,7 @@
 name: Launcher Build
 on:
   push:
-    branches: [ master ]
+    branches: [master]
 
 jobs:
   create-release:
@@ -13,7 +13,7 @@ jobs:
 
       - name: Get version
         run: echo "version=$(jq -r .version package.json)" >> $GITHUB_ENV
-      
+
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
@@ -31,7 +31,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [macos-14, ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest]
 
     steps:
       - name: Check out Git repository

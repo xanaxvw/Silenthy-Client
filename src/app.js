@@ -1,116 +1,228 @@
 /**
- * @author Luuxis
- * @license CC-BY-NC 4.0 - https://creativecommons.org/licenses/by-nc/4.0
+ * @author itzrauh
  */
 
-const { app, ipcMain, nativeTheme } = require('electron');
-const { Microsoft } = require('minecraft-java-core');
-const { autoUpdater } = require('electron-updater')
+const { app, ipcMain, nativeTheme } = require("electron");
+const { Microsoft } = require("minecraft-java-core");
+const { autoUpdater } = require("electron-updater");
 
-const path = require('path');
-const fs = require('fs');
+const path = require("path");
+const fs = require("fs");
 
 const UpdateWindow = require("./assets/js/windows/updateWindow.js");
 const MainWindow = require("./assets/js/windows/mainWindow.js");
 
-let dev = process.env.NODE_ENV === 'dev';
-
+let dev = process.env.NODE_ENV === "dev";
+//dev = false ESTA COSA es para que si la pones sin comentario te salga lo de update
 if (dev) {
-    let appPath = path.resolve('./data/Launcher').replace(/\\/g, '/');
-    let appdata = path.resolve('./data').replace(/\\/g, '/');
-    if (!fs.existsSync(appPath)) fs.mkdirSync(appPath, { recursive: true });
-    if (!fs.existsSync(appdata)) fs.mkdirSync(appdata, { recursive: true });
-    app.setPath('userData', appPath);
-    app.setPath('appData', appdata)
+  let appPath = path.resolve("./data/Launcher").replace(/\\/g, "/");
+  let appdata = path.resolve("./data").replace(/\\/g, "/");
+  if (!fs.existsSync(appPath)) fs.mkdirSync(appPath, { recursive: true });
+  if (!fs.existsSync(appdata)) fs.mkdirSync(appdata, { recursive: true });
+  app.setPath("userData", appPath);
+  app.setPath("appData", appdata);
 }
 
 if (!app.requestSingleInstanceLock()) app.quit();
-else app.whenReady().then(() => {
-    if (dev) return MainWindow.createWindow()
-    UpdateWindow.createWindow()
+else
+  app.whenReady().then(() => {
+    if (dev) return MainWindow.createWindow();
+    UpdateWindow.createWindow();
+  });
+
+ipcMain.on("main-window-open", () => MainWindow.createWindow());
+ipcMain.on("main-window-dev-tools", () =>
+  MainWindow.getWindow().webContents.openDevTools({ mode: "detach" })
+);
+ipcMain.on("main-window-dev-tools-close", () =>
+  MainWindow.getWindow().webContents.closeDevTools()
+);
+ipcMain.on("main-window-close", () => MainWindow.destroyWindow());
+ipcMain.on("main-window-reload", () => MainWindow.getWindow().reload());
+ipcMain.on("main-window-progress", (event, options) =>
+  MainWindow.getWindow().setProgressBar(options.progress / options.size)
+);
+ipcMain.on("main-window-progress-reset", () =>
+  MainWindow.getWindow().setProgressBar(-1)
+);
+ipcMain.on("main-window-progress-load", () =>
+  MainWindow.getWindow().setProgressBar(2)
+);
+ipcMain.on("main-window-minimize", () => MainWindow.getWindow().minimize());
+
+ipcMain.on("update-window-close", () => UpdateWindow.destroyWindow());
+ipcMain.on("update-window-dev-tools", () =>
+  UpdateWindow.getWindow().webContents.openDevTools({ mode: "detach" })
+);
+ipcMain.on("update-window-progress", (event, options) =>
+  UpdateWindow.getWindow().setProgressBar(options.progress / options.size)
+);
+ipcMain.on("update-window-progress-reset", () =>
+  UpdateWindow.getWindow().setProgressBar(-1)
+);
+ipcMain.on("update-window-progress-load", () =>
+  UpdateWindow.getWindow().setProgressBar(2)
+);
+
+ipcMain.handle("path-user-data", () => app.getPath("userData"));
+ipcMain.handle("appData", (e) => app.getPath("appData"));
+
+ipcMain.on("main-window-maximize", () => {
+  if (MainWindow.getWindow().isMaximized()) {
+    MainWindow.getWindow().unmaximize();
+  } else {
+    MainWindow.getWindow().maximize();
+  }
 });
 
-ipcMain.on('main-window-open', () => MainWindow.createWindow())
-ipcMain.on('main-window-dev-tools', () => MainWindow.getWindow().webContents.openDevTools({ mode: 'detach' }))
-ipcMain.on('main-window-dev-tools-close', () => MainWindow.getWindow().webContents.closeDevTools())
-ipcMain.on('main-window-close', () => MainWindow.destroyWindow())
-ipcMain.on('main-window-reload', () => MainWindow.getWindow().reload())
-ipcMain.on('main-window-progress', (event, options) => MainWindow.getWindow().setProgressBar(options.progress / options.size))
-ipcMain.on('main-window-progress-reset', () => MainWindow.getWindow().setProgressBar(-1))
-ipcMain.on('main-window-progress-load', () => MainWindow.getWindow().setProgressBar(2))
-ipcMain.on('main-window-minimize', () => MainWindow.getWindow().minimize())
+ipcMain.on("main-window-hide", () => MainWindow.getWindow().hide());
+ipcMain.on("main-window-show", () => MainWindow.getWindow().show());
 
-ipcMain.on('update-window-close', () => UpdateWindow.destroyWindow())
-ipcMain.on('update-window-dev-tools', () => UpdateWindow.getWindow().webContents.openDevTools({ mode: 'detach' }))
-ipcMain.on('update-window-progress', (event, options) => UpdateWindow.getWindow().setProgressBar(options.progress / options.size))
-ipcMain.on('update-window-progress-reset', () => UpdateWindow.getWindow().setProgressBar(-1))
-ipcMain.on('update-window-progress-load', () => UpdateWindow.getWindow().setProgressBar(2))
+ipcMain.handle("Microsoft-window", async (_, client_id) => {
+  return await new Microsoft(client_id).getAuth();
+});
 
-ipcMain.handle('path-user-data', () => app.getPath('userData'))
-ipcMain.handle('appData', e => app.getPath('appData'))
+ipcMain.handle("is-dark-theme", (_, theme) => {
+  if (theme === "dark") return true;
+  if (theme === "light") return false;
+  return nativeTheme.shouldUseDarkColors;
+});
 
-ipcMain.on('main-window-maximize', () => {
-    if (MainWindow.getWindow().isMaximized()) {
-        MainWindow.getWindow().unmaximize();
-    } else {
-        MainWindow.getWindow().maximize();
-    }
-})
+app.on("window-all-closed", () => app.quit());
 
-ipcMain.on('main-window-hide', () => MainWindow.getWindow().hide())
-ipcMain.on('main-window-show', () => MainWindow.getWindow().show())
+let startedAppTime = Date.now();
+const pkg = require("../package.json");
 
-ipcMain.handle('Microsoft-window', async (_, client_id) => {
-    return await new Microsoft(client_id).getAuth();
-})
+const rpc = require("discord-rpc");
+let client = new rpc.Client({ transport: "ipc" });
+client.login({ clientId: "1353364181675675658" });
 
-ipcMain.handle('is-dark-theme', (_, theme) => {
-    if (theme === 'dark') return true
-    if (theme === 'light') return false
-    return nativeTheme.shouldUseDarkColors;
-})
+ipcMain.on("new-status-discord-login", async () => {
+  client.request("SET_ACTIVITY", {
+    pid: process.pid,
+    activity: {
+      details: "Iniciando sesión",
+      assets: {
+        large_image: "icon",
+        large_text: `${pkg.version} | ${pkg.versionType}`,
+      },
+      instance: false,
+      timestamps: {
+        start: startedAppTime,
+      },
+    },
+  });
+});
+ipcMain.on(
+  "new-status-discord-username",
+  async (event, username, iconUrl, name) => {
+    client.request("SET_ACTIVITY", {
+      pid: process.pid,
+      activity: {
+        details: "En el menú inicial",
+        state: `Nombre de usuario: ${username}`,
+        assets: {
+          large_image: "icon",
+          large_text: `${pkg.version} | ${pkg.versionType}`,
+          small_image: `${iconUrl}`,
+          small_text: `${name}`,
+        },
+        instance: false,
+        timestamps: {
+          start: startedAppTime,
+        },
+      },
+    });
+  }
+);
 
-app.on('window-all-closed', () => app.quit());
+ipcMain.on(
+  "new-status-discord-play",
+  async (event, iconUrl, name, username) => {
+    client.request("SET_ACTIVITY", {
+      pid: process.pid,
+      activity: {
+        details: `Jugando a ${name}`,
+        state: `Nombre de usuario: ${username}`,
+        assets: {
+          large_image: `icon`,
+          large_text: `${pkg.version} | ${pkg.versionType}`,
+          small_image: `${iconUrl}`,
+          small_text: `${name}`,
+          instance: false,
+          timestamps: {
+            start: startedAppTime,
+          },
+        },
+      },
+    });
+  }
+);
+ipcMain.on(
+  "new-status-discord-other",
+  async (event, username, iconUrl, name, status) => {
+    client.request("SET_ACTIVITY", {
+      pid: process.pid,
+      activity: {
+        details: `${status}`,
+        state: `Nombre de usuario: ${username}`,
+        assets: {
+          large_image: "icon",
+          large_text: `${pkg.version} | ${pkg.versionType}`,
+          small_image: `${iconUrl}`,
+          small_text: `${name}`,
+        },
+        instance: false,
+        timestamps: {
+          start: startedAppTime,
+        },
+      },
+    });
+  }
+);
 
 autoUpdater.autoDownload = false;
 
-ipcMain.handle('update-app', async () => {
-    return await new Promise(async (resolve, reject) => {
-        autoUpdater.checkForUpdates().then(res => {
-            resolve(res);
-        }).catch(error => {
-            reject({
-                error: true,
-                message: error
-            })
-        })
-    })
-})
 
-autoUpdater.on('update-available', () => {
-    const updateWindow = UpdateWindow.getWindow();
-    if (updateWindow) updateWindow.webContents.send('updateAvailable');
+ipcMain.handle("update-app", async () => {
+  return await new Promise(async (resolve, reject) => {
+    autoUpdater
+      .checkForUpdates()
+      .then((res) => {
+        resolve(res);
+      })
+      .catch((error) => {
+        reject({
+          error: true,
+          message: error,
+        });
+      });
+  });
 });
 
-ipcMain.on('start-update', () => {
-    autoUpdater.downloadUpdate();
-})
-
-autoUpdater.on('update-not-available', () => {
-    const updateWindow = UpdateWindow.getWindow();
-    if (updateWindow) updateWindow.webContents.send('update-not-available');
+autoUpdater.on("update-available", () => {
+  const updateWindow = UpdateWindow.getWindow();
+  if (updateWindow) updateWindow.webContents.send("updateAvailable");
 });
 
-autoUpdater.on('update-downloaded', () => {
-    autoUpdater.quitAndInstall();
+ipcMain.on("start-update", () => {
+  autoUpdater.downloadUpdate();
 });
 
-autoUpdater.on('download-progress', (progress) => {
-    const updateWindow = UpdateWindow.getWindow();
-    if (updateWindow) updateWindow.webContents.send('download-progress', progress);
-})
+autoUpdater.on("update-not-available", () => {
+  const updateWindow = UpdateWindow.getWindow();
+  if (updateWindow) updateWindow.webContents.send("update-not-available");
+});
 
-autoUpdater.on('error', (err) => {
-    const updateWindow = UpdateWindow.getWindow();
-    if (updateWindow) updateWindow.webContents.send('error', err);
+autoUpdater.on("update-downloaded", () => {
+  autoUpdater.quitAndInstall();
+});
+
+autoUpdater.on("download-progress", (progress) => {
+  const updateWindow = UpdateWindow.getWindow();
+});
+
+autoUpdater.on("error", (err) => {
+  const updateWindow = UpdateWindow.getWindow();
+  if (updateWindow) updateWindow.webContents.send("error", err);
 });
